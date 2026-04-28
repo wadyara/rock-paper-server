@@ -35,10 +35,10 @@ let opponentIndex = null;
 let roundTimeLimit = 15;
 let roundTimerInterval = null;
 let myMoveDone = false;
-let waitingForAnimation = false;    // идёт анимация/ожидание перед анимацией
-let pendingRoundData = null;        // данные roundResult, если пришли во время анимации
+let waitingForAnimation = false;      // идёт анимация/показ результата
+let pendingNewRoundData = null;       // отложенный newRound
 
-// --- Вспомогательные функции ---
+// --- Таймер ---
 function startClientTimer(seconds) {
     if (roundTimerInterval) clearInterval(roundTimerInterval);
     let remaining = seconds;
@@ -54,36 +54,28 @@ function stopClientTimer() {
     if (roundTimerInterval) clearInterval(roundTimerInterval);
 }
 
-// Анимация подъёма руки с заданными таймингами
+// --- Анимация подъёма руки для одного бойца ---
 function animateArm(playerElement, direction, onComplete) {
-    // direction: 'left' (левый игрок) или 'right' (правый)
     const isLeft = direction === 'left';
-    // Параметры движения: подъём на 100px вверх и 20px вбок
     const upY = -100;
     const sideX = isLeft ? -20 : 20;
     
-    // Функция для выполнения одного подъёма-возврата
     function doRaise(callback) {
-        // Подъём за 0.25с
         playerElement.style.transition = 'transform 0.25s ease-out';
         playerElement.style.transform = `translate(${sideX}px, ${upY}px)`;
         setTimeout(() => {
-            // Возврат за 0.25с
             playerElement.style.transition = 'transform 0.25s ease-in';
             playerElement.style.transform = 'translate(0, 0)';
             setTimeout(callback, 250);
         }, 250);
     }
     
-    // Первый подъём + пауза 0.5с
+    // Три подъёма: первый с паузой, второй с паузой, третий без паузы
     doRaise(() => {
         setTimeout(() => {
-            // Второй подъём + пауза 0.5с
             doRaise(() => {
                 setTimeout(() => {
-                    // Третий подъём без паузы в конце (сразу завершаем)
                     doRaise(() => {
-                        // Анимация закончена
                         if (onComplete) onComplete();
                     });
                 }, 500);
@@ -92,32 +84,26 @@ function animateArm(playerElement, direction, onComplete) {
     });
 }
 
-// Запуск полной анимации для обоих игроков
+// Запуск полной анимации для обоих
 function startFullAnimation(myMove, oppMove, onFinished) {
-    // Скрываем панель выбора, показываем арену
     movesPanel.style.display = 'none';
     arenaDiv.style.display = 'flex';
-    // Сбрасываем картинки на кулак
     fighter1Img.style.backgroundImage = "url('/images/fist.svg')";
     fighter2Img.style.backgroundImage = "url('/images/fist.svg')";
-    fighter1Img.style.transform = ''; // сброс
+    fighter1Img.style.transform = '';
     fighter2Img.style.transform = '';
-    
-    // Имена в арене
     fighter1NameSpan.innerText = player1Name.innerText;
     fighter2NameSpan.innerText = player2Name.innerText;
     
-    // Пауза 2 секунды перед началом движений
+    // Пауза 2 секунды перед началом анимации
     setTimeout(() => {
-        // Запускаем анимацию для левого и правого одновременно
         let finishedCount = 0;
         function oneFinished() {
             finishedCount++;
             if (finishedCount === 2) {
-                // Оба закончили – показываем выбранные фигуры
+                // Показываем выбранные фигуры
                 fighter1Img.style.backgroundImage = `url('/images/${myMove}.svg')`;
                 fighter2Img.style.backgroundImage = `url('/images/${oppMove}.svg')`;
-                // Небольшая задержка для появления
                 setTimeout(() => {
                     if (onFinished) onFinished();
                 }, 200);
@@ -125,12 +111,11 @@ function startFullAnimation(myMove, oppMove, onFinished) {
         }
         animateArm(fighter1Img, 'left', oneFinished);
         animateArm(fighter2Img, 'right', oneFinished);
-    }, 2000); // 2 секунды ожидания
+    }, 2000);
 }
 
-// Показ результата раунда после анимации
+// Обработка результата раунда после анимации
 function resolveRound(data) {
-    // Обновляем счёт
     player1ScoreSpan.innerText = data.scores[0];
     player2ScoreSpan.innerText = data.scores[1];
     
@@ -139,7 +124,6 @@ function resolveRound(data) {
     else if (data.winner === 'player2') winnerIdx = 1;
     
     if (winnerIdx !== null) {
-        // Конфетти для победителя
         if (winnerIdx === myPlayerIndex) {
             canvasConfetti({ particleCount: 180, spread: 80, origin: { y: 0.6 } });
             resultMsgDiv.innerText = '🎉 Вы выиграли раунд! 🎉';
@@ -151,19 +135,36 @@ function resolveRound(data) {
         resultMsgDiv.innerText = '🤝 Ничья!';
     }
     
-    // Через 3 секунды готовим следующий раунд (или окончание игры)
+    // Ждём 3 секунды, затем завершаем показ результата
     setTimeout(() => {
         waitingForAnimation = false;
         myMoveDone = false;
-        if (pendingRoundData === null) {
-            // Возвращаем панель выбора, если игра не закончена
+        // Если есть отложенный newRound, применяем его
+        if (pendingNewRoundData) {
+            applyNewRound(pendingNewRoundData);
+            pendingNewRoundData = null;
+        } else {
+            // Если игра не закончена, возвращаем панель выбора (на случай, если newRound не пришёл)
             movesPanel.style.display = 'flex';
             arenaDiv.style.display = 'none';
         }
     }, 3000);
 }
 
-// --- События сокета ---
+// Применение нового раунда (показывает панель, запускает таймер)
+function applyNewRound(data) {
+    movesPanel.style.display = 'flex';
+    arenaDiv.style.display = 'none';
+    roundSpan.innerText = data.round;
+    roundTimeLimit = data.timeLimit;
+    startClientTimer(roundTimeLimit);
+    myMoveDone = false;
+    waitingForAnimation = false;
+    moveBtns.forEach(btn => btn.disabled = false);
+    resultMsgDiv.innerText = 'Раунд начался! Выберите фигуру.';
+}
+
+// --- Сокет-события ---
 socket.on('waiting', () => {
     waitingMsg.style.display = 'block';
     findBtn.disabled = true;
@@ -188,7 +189,7 @@ socket.on('gameStart', async (data) => {
     
     myMoveDone = false;
     waitingForAnimation = false;
-    pendingRoundData = null;
+    pendingNewRoundData = null;
     moveBtns.forEach(btn => {
         btn.classList.remove('disabled-btn');
         btn.disabled = false;
@@ -209,7 +210,8 @@ socket.on('opponentInfo', ({ name, avatar }) => {
 });
 
 socket.on('opponentMadeMove', () => {
-    resultMsgDiv.innerText = 'Соперник сделал ход, ожидаем...';
+    if (!waitingForAnimation)
+        resultMsgDiv.innerText = 'Соперник сделал ход, ожидаем...';
 });
 
 socket.on('autoMove', ({ move }) => {
@@ -222,11 +224,7 @@ socket.on('autoMove', ({ move }) => {
 
 socket.on('roundResult', (data) => {
     stopClientTimer();
-    if (waitingForAnimation) {
-        // Уже идёт анимация – сохраняем данные на потом (не должно случиться, но на всякий случай)
-        pendingRoundData = data;
-        return;
-    }
+    if (waitingForAnimation) return; // предохранитель
     waitingForAnimation = true;
     myMoveDone = true;
     moveBtns.forEach(btn => btn.disabled = true);
@@ -234,32 +232,18 @@ socket.on('roundResult', (data) => {
     const myMove = data.moves[myPlayerIndex];
     const oppMove = data.moves[opponentIndex];
     
-    // Запускаем анимацию
     startFullAnimation(myMove, oppMove, () => {
         resolveRound(data);
-        // Если за время анимации пришёл ещё один roundResult (очень редко) – обработаем
-        if (pendingRoundData) {
-            const nextData = pendingRoundData;
-            pendingRoundData = null;
-            // Не запускаем анимацию повторно, просто обновляем результат (но по логике такого быть не должно)
-            resolveRound(nextData);
-        }
     });
 });
 
 socket.on('newRound', (data) => {
-    // Возвращаем панель выбора, если игра не в процессе анимации
-    if (!waitingForAnimation) {
-        movesPanel.style.display = 'flex';
-        arenaDiv.style.display = 'none';
+    // Если сейчас идёт показ результата (анимация + пауза 3с) – откладываем
+    if (waitingForAnimation) {
+        pendingNewRoundData = data;
+    } else {
+        applyNewRound(data);
     }
-    roundSpan.innerText = data.round;
-    roundTimeLimit = data.timeLimit;
-    startClientTimer(roundTimeLimit);
-    myMoveDone = false;
-    waitingForAnimation = false;
-    moveBtns.forEach(btn => btn.disabled = false);
-    resultMsgDiv.innerText = 'Раунд начался! Выберите фигуру.';
 });
 
 socket.on('gameOver', (data) => {
@@ -292,7 +276,7 @@ function makeMove(move) {
     resultMsgDiv.innerText = 'Ход сделан, ждём соперника...';
 }
 
-// --- Получение профиля (заглушка или Яндекс) ---
+// --- Информация о себе ---
 async function sendMyInfo() {
     try {
         let name = 'Игрок', avatar = '';
@@ -310,7 +294,7 @@ async function sendMyInfo() {
     } catch(e) { console.warn(e); }
 }
 
-// --- Привязка событий ---
+// --- Навешиваем обработчики ---
 moveBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         const move = btn.getAttribute('data-move');
