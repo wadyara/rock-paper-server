@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Камень, Ножницы, Бумага</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <button id="findBtn">Найти соперника</button>
+        <div id="gameArea" style="display: none;">
+            <div>Соперник: <span id="opponentName">...</span></div>
+            <div>Ваш ход: 
+                <button id="rock">Камень</button>
+                <button id="paper">Бумага</button>
+                <button id="scissors">Ножницы</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Подключаем Socket.IO клиент -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
