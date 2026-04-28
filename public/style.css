@@ -1,0 +1,166 @@
+* {
+    box-sizing: border-box;
+    user-select: none;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #1e2b3a, #0f1a24);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0;
+    padding: 16px;
+}
+
+#game-container {
+    max-width: 800px;
+    width: 100%;
+    background: rgba(255,255,255,0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 48px;
+    padding: 20px;
+    box-shadow: 0 25px 40px rgba(0,0,0,0.3);
+}
+
+.screen {
+    transition: all 0.3s ease;
+}
+
+.primary-btn {
+    background: #ff9800;
+    border: none;
+    padding: 16px 32px;
+    font-size: 1.5rem;
+    font-weight: bold;
+    border-radius: 60px;
+    color: #1e2b3a;
+    cursor: pointer;
+    transition: transform 0.1s, background 0.2s;
+    width: 100%;
+    max-width: 300px;
+    display: block;
+    margin: 20px auto;
+}
+
+.primary-btn:active {
+    transform: scale(0.96);
+}
+
+#players {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 30px;
+}
+
+.player-card {
+    background: #2c3e2f;
+    padding: 20px;
+    border-radius: 32px;
+    text-align: center;
+    flex: 1;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+    transition: all 0.2s;
+}
+
+.vs {
+    font-size: 2rem;
+    font-weight: bold;
+    text-shadow: 0 0 8px white;
+}
+
+.avatar {
+    width: 80px;
+    height: 80px;
+    background: #aaa;
+    border-radius: 50%;
+    margin: 0 auto 12px;
+    background-size: cover;
+    background-position: center;
+    border: 3px solid gold;
+}
+
+.name {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: white;
+}
+
+.score {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #ffd966;
+}
+
+.thinking-animation {
+    font-size: 0.9rem;
+    margin-top: 8px;
+    color: #ffb74d;
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.4; }
+    100% { opacity: 1; }
+}
+
+#move-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    margin: 20px 0;
+    flex-wrap: wrap;
+}
+
+.move-btn {
+    background: #2c3e50;
+    border: none;
+    padding: 12px 24px;
+    font-size: 1.3rem;
+    border-radius: 48px;
+    cursor: pointer;
+    transition: filter 0.1s;
+    color: white;
+    font-weight: bold;
+    box-shadow: 0 4px 8px black;
+}
+
+.move-btn:active {
+    transform: scale(0.95);
+}
+
+.move-btn:disabled {
+    opacity: 0.5;
+    transform: none;
+}
+
+#round-info {
+    text-align: center;
+    font-size: 1.3rem;
+    color: #ddd;
+    margin: 12px 0;
+}
+
+.message {
+    text-align: center;
+    font-size: 1.2rem;
+    background: #000000aa;
+    border-radius: 40px;
+    padding: 12px;
+    margin-top: 20px;
+    color: white;
+}
+
+/* Анимация выбора (быстрое переключение картинок) */
+.animate-choice {
+    animation: spinChoices 0.5s infinite;
+}
+
+@keyframes spinChoices {
+    0% { content: "🪨"; }
+    33% { content: "📄"; }
+    66% { content: "✂️"; }
+}

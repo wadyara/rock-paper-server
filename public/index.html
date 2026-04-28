@@ -1,24 +1,68 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-    <title>Камень, Ножницы, Бумага</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Камень, Ножницы, Бумага – мультиплеер</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="app">
-        <button id="findBtn">Найти соперника</button>
-        <div id="gameArea" style="display: none;">
-            <div>Соперник: <span id="opponentName">...</span></div>
-            <div>Ваш ход: 
-                <button id="rock">Камень</button>
-                <button id="paper">Бумага</button>
-                <button id="scissors">Ножницы</button>
+    <div id="game-container">
+        <!-- ЭКРАН ПОИСКА -->
+        <div id="search-screen" class="screen active">
+            <button id="find-btn" class="primary-btn">🔍 Поиск игрока</button>
+            <div id="waiting-message" style="display: none;">⏳ Ожидание соперника...</div>
+        </div>
+
+        <!-- ИГРОВОЙ ЭКРАН -->
+        <div id="game-screen" class="screen" style="display: none;">
+            <div id="players">
+                <div class="player-card" id="player1-card">
+                    <div class="avatar" id="player1-avatar"></div>
+                    <div class="name" id="player1-name">Вы</div>
+                    <div class="score" id="player1-score">0</div>
+                    <div class="thinking-animation" id="player1-thinking" style="display: none;">⚡ думает...</div>
+                </div>
+                <div class="vs">VS</div>
+                <div class="player-card" id="player2-card">
+                    <div class="avatar" id="player2-avatar"></div>
+                    <div class="name" id="player2-name">Соперник</div>
+                    <div class="score" id="player2-score">0</div>
+                    <div class="thinking-animation" id="player2-thinking" style="display: none;">⚡ думает...</div>
+                </div>
             </div>
+
+            <div id="round-info">
+                Раунд: <span id="round-number">1</span> | Таймер: <span id="timer">15</span> сек
+            </div>
+
+            <div id="move-buttons">
+                <button class="move-btn" data-move="rock">🪨 Камень</button>
+                <button class="move-btn" data-move="paper">📄 Бумага</button>
+                <button class="move-btn" data-move="scissors">✂️ Ножницы</button>
+            </div>
+
+            <div id="result-message" class="message"></div>
+        </div>
+
+        <!-- ЭКРАН ОКОНЧАНИЯ ИГРЫ -->
+        <div id="gameover-screen" class="screen" style="display: none;">
+            <h2 id="gameover-text"></h2>
+            <button id="play-again-btn" class="primary-btn">🎮 Играть снова</button>
         </div>
     </div>
 
-    <!-- Подключаем Socket.IO клиент -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="script.js"></script>
+    <!-- Имитация Яндекс SDK (для локальной отладки) -->
+    <script>
+        // Заглушка для Яндекс.Игр – при публикации замените на реальный SDK
+        window.YaGames = {
+            getPlayer: () => Promise.resolve({
+                getName: () => Promise.resolve('Тестовый игрок'),
+                getAvatarSrc: () => Promise.resolve('https://via.placeholder.com/100')
+            })
+        };
+    </script>
 </body>
 </html>
