@@ -30,12 +30,13 @@ const moveBtns = document.querySelectorAll('.move-btn');
 
 // Состояния
 let currentRoomId = null;
-let myPlayerIndex = null;       // 0 или 1
+let myPlayerIndex = null;
 let opponentIndex = null;
 let roundTimeLimit = 15;
 let roundTimerInterval = null;
 let myMoveDone = false;
-let waitingForRoundResult = false;   // чтобы не кликать во время анимации
+let waitingForAnimation = false;    // идёт анимация/ожидание перед анимацией
+let pendingRoundData = null;        // данные roundResult, если пришли во время анимации
 
 // --- Вспомогательные функции ---
 function startClientTimer(seconds) {
@@ -45,82 +46,124 @@ function startClientTimer(seconds) {
     roundTimerInterval = setInterval(() => {
         remaining--;
         timerSpan.innerText = remaining >= 0 ? remaining : 0;
-        if (remaining <= 0) {
-            clearInterval(roundTimerInterval);
-            roundTimerInterval = null;
-        }
+        if (remaining <= 0) clearInterval(roundTimerInterval);
     }, 1000);
 }
 
 function stopClientTimer() {
-    if (roundTimerInterval) {
-        clearInterval(roundTimerInterval);
-        roundTimerInterval = null;
-    }
+    if (roundTimerInterval) clearInterval(roundTimerInterval);
 }
 
-// Показываем арену, прячем кнопки
-function showArenaAndHideMoves() {
+// Анимация подъёма руки с заданными таймингами
+function animateArm(playerElement, direction, onComplete) {
+    // direction: 'left' (левый игрок) или 'right' (правый)
+    const isLeft = direction === 'left';
+    // Параметры движения: подъём на 100px вверх и 20px вбок
+    const upY = -100;
+    const sideX = isLeft ? -20 : 20;
+    
+    // Функция для выполнения одного подъёма-возврата
+    function doRaise(callback) {
+        // Подъём за 0.25с
+        playerElement.style.transition = 'transform 0.25s ease-out';
+        playerElement.style.transform = `translate(${sideX}px, ${upY}px)`;
+        setTimeout(() => {
+            // Возврат за 0.25с
+            playerElement.style.transition = 'transform 0.25s ease-in';
+            playerElement.style.transform = 'translate(0, 0)';
+            setTimeout(callback, 250);
+        }, 250);
+    }
+    
+    // Первый подъём + пауза 0.5с
+    doRaise(() => {
+        setTimeout(() => {
+            // Второй подъём + пауза 0.5с
+            doRaise(() => {
+                setTimeout(() => {
+                    // Третий подъём без паузы в конце (сразу завершаем)
+                    doRaise(() => {
+                        // Анимация закончена
+                        if (onComplete) onComplete();
+                    });
+                }, 500);
+            });
+        }, 500);
+    });
+}
+
+// Запуск полной анимации для обоих игроков
+function startFullAnimation(myMove, oppMove, onFinished) {
+    // Скрываем панель выбора, показываем арену
     movesPanel.style.display = 'none';
     arenaDiv.style.display = 'flex';
-}
-
-// Прячем арену, показываем кнопки
-function showMovesAndHideArena() {
-    arenaDiv.style.display = 'none';
-    movesPanel.style.display = 'flex';
-    // сброс изображений на кулак
+    // Сбрасываем картинки на кулак
     fighter1Img.style.backgroundImage = "url('/images/fist.svg')";
     fighter2Img.style.backgroundImage = "url('/images/fist.svg')";
-    // убираем классы анимации
-    fighter1Img.classList.remove('shake', 'celebration');
-    fighter2Img.classList.remove('shake', 'celebration');
-}
-
-// Анимация тряски кулаков дважды, затем смена на фигуры
-function animateFightAndShowChoices(myMove, oppMove, onComplete) {
-    // Устанавливаем имена игроков в арене
+    fighter1Img.style.transform = ''; // сброс
+    fighter2Img.style.transform = '';
+    
+    // Имена в арене
     fighter1NameSpan.innerText = player1Name.innerText;
     fighter2NameSpan.innerText = player2Name.innerText;
     
-    // Добавляем класс тряски для обоих
-    fighter1Img.classList.add('shake');
-    fighter2Img.classList.add('shake');
-    
-    // Через 0.6 сек (два цикла тряски) меняем картинки
+    // Пауза 2 секунды перед началом движений
     setTimeout(() => {
-        fighter1Img.classList.remove('shake');
-        fighter2Img.classList.remove('shake');
-        // Замена на картинки ходов
-        fighter1Img.style.backgroundImage = `url('/images/${myMove}.svg')`;
-        fighter2Img.style.backgroundImage = `url('/images/${oppMove}.svg')`;
-        
-        // Даём анимацию появления (scale)
-        fighter1Img.style.transform = 'scale(1.1)';
-        fighter2Img.style.transform = 'scale(1.1)';
-        setTimeout(() => {
-            fighter1Img.style.transform = '';
-            fighter2Img.style.transform = '';
-            onComplete();
-        }, 200);
-    }, 600);
+        // Запускаем анимацию для левого и правого одновременно
+        let finishedCount = 0;
+        function oneFinished() {
+            finishedCount++;
+            if (finishedCount === 2) {
+                // Оба закончили – показываем выбранные фигуры
+                fighter1Img.style.backgroundImage = `url('/images/${myMove}.svg')`;
+                fighter2Img.style.backgroundImage = `url('/images/${oppMove}.svg')`;
+                // Небольшая задержка для появления
+                setTimeout(() => {
+                    if (onFinished) onFinished();
+                }, 200);
+            }
+        }
+        animateArm(fighter1Img, 'left', oneFinished);
+        animateArm(fighter2Img, 'right', oneFinished);
+    }, 2000); // 2 секунды ожидания
 }
 
-// Запуск конфетти для определённого игрока (0 - я, 1 - соперник)
-function celebrateWinner(winnerIndex) {
-    const isMe = (winnerIndex === myPlayerIndex);
-    if (isMe) {
-        canvasConfetti({ particleCount: 180, spread: 80, origin: { y: 0.6 }, startVelocity: 20, colors: ['#ffd700', '#ffaa00'] });
+// Показ результата раунда после анимации
+function resolveRound(data) {
+    // Обновляем счёт
+    player1ScoreSpan.innerText = data.scores[0];
+    player2ScoreSpan.innerText = data.scores[1];
+    
+    let winnerIdx = null;
+    if (data.winner === 'player1') winnerIdx = 0;
+    else if (data.winner === 'player2') winnerIdx = 1;
+    
+    if (winnerIdx !== null) {
+        // Конфетти для победителя
+        if (winnerIdx === myPlayerIndex) {
+            canvasConfetti({ particleCount: 180, spread: 80, origin: { y: 0.6 } });
+            resultMsgDiv.innerText = '🎉 Вы выиграли раунд! 🎉';
+        } else {
+            canvasConfetti({ particleCount: 100, spread: 60, origin: { y: 0.3 }, colors: ['#ff5555'] });
+            resultMsgDiv.innerText = '😞 Соперник выиграл раунд...';
+        }
     } else {
-        canvasConfetti({ particleCount: 100, spread: 60, origin: { y: 0.3 }, startVelocity: 15, colors: ['#ff5555', '#aa2222'] });
+        resultMsgDiv.innerText = '🤝 Ничья!';
     }
-    // Доп. визуал на карточке
-    const winnerCard = (winnerIndex === 0) ? document.getElementById('player1-card') : document.getElementById('player2-card');
-    winnerCard.classList.add('celebration');
-    setTimeout(() => winnerCard.classList.remove('celebration'), 800);
+    
+    // Через 3 секунды готовим следующий раунд (или окончание игры)
+    setTimeout(() => {
+        waitingForAnimation = false;
+        myMoveDone = false;
+        if (pendingRoundData === null) {
+            // Возвращаем панель выбора, если игра не закончена
+            movesPanel.style.display = 'flex';
+            arenaDiv.style.display = 'none';
+        }
+    }, 3000);
 }
 
-// --- Обработчики событий сокета ---
+// --- События сокета ---
 socket.on('waiting', () => {
     waitingMsg.style.display = 'block';
     findBtn.disabled = true;
@@ -144,16 +187,17 @@ socket.on('gameStart', async (data) => {
     startClientTimer(roundTimeLimit);
     
     myMoveDone = false;
-    waitingForRoundResult = false;
+    waitingForAnimation = false;
+    pendingRoundData = null;
     moveBtns.forEach(btn => {
         btn.classList.remove('disabled-btn');
         btn.disabled = false;
     });
-    showMovesAndHideArena();
+    movesPanel.style.display = 'flex';
+    arenaDiv.style.display = 'none';
     resultMsgDiv.innerText = 'Сделайте ход!';
 });
 
-// Получение информации о сопернике
 socket.on('opponentInfo', ({ name, avatar }) => {
     if (opponentIndex === 1) {
         player2Name.innerText = name;
@@ -165,89 +209,69 @@ socket.on('opponentInfo', ({ name, avatar }) => {
 });
 
 socket.on('opponentMadeMove', () => {
-    resultMsgDiv.innerText = 'Соперник сделал ход! Ожидаем разрешения...';
+    resultMsgDiv.innerText = 'Соперник сделал ход, ожидаем...';
 });
 
-// Автовыбор со стороны сервера (когда время вышло)
 socket.on('autoMove', ({ move }) => {
-    if (!myMoveDone && !waitingForRoundResult) {
+    if (!myMoveDone && !waitingForAnimation) {
         myMoveDone = true;
         moveBtns.forEach(btn => btn.disabled = true);
-        resultMsgDiv.innerText = `⏰ Время вышло! Автовыбор: ${move}`;
-        // дополнительно можно показать анимацию, но сервер сам вызовет roundResult
+        resultMsgDiv.innerText = `⏰ Автовыбор: ${move}`;
     }
 });
 
-// Результат раунда (самое важное)
 socket.on('roundResult', (data) => {
     stopClientTimer();
-    waitingForRoundResult = true;
+    if (waitingForAnimation) {
+        // Уже идёт анимация – сохраняем данные на потом (не должно случиться, но на всякий случай)
+        pendingRoundData = data;
+        return;
+    }
+    waitingForAnimation = true;
+    myMoveDone = true;
+    moveBtns.forEach(btn => btn.disabled = true);
     
     const myMove = data.moves[myPlayerIndex];
     const oppMove = data.moves[opponentIndex];
     
-    // Скрываем панель выбора, показываем арену
-    showArenaAndHideMoves();
-    
-    // Запускаем анимацию тряски -> показ фигур
-    animateFightAndShowChoices(myMove, oppMove, () => {
-        // Определяем победителя
-        let winnerIdx = null;
-        if (data.winner === 'player1') winnerIdx = 0;
-        else if (data.winner === 'player2') winnerIdx = 1;
-        
-        if (winnerIdx !== null) {
-            // Празднуем победителя
-            celebrateWinner(winnerIdx);
-            const winnerText = (winnerIdx === myPlayerIndex) ? 'Вы выиграли раунд!' : 'Соперник выиграл раунд!';
-            resultMsgDiv.innerText = winnerText;
-        } else {
-            resultMsgDiv.innerText = 'Ничья! 🤝';
+    // Запускаем анимацию
+    startFullAnimation(myMove, oppMove, () => {
+        resolveRound(data);
+        // Если за время анимации пришёл ещё один roundResult (очень редко) – обработаем
+        if (pendingRoundData) {
+            const nextData = pendingRoundData;
+            pendingRoundData = null;
+            // Не запускаем анимацию повторно, просто обновляем результат (но по логике такого быть не должно)
+            resolveRound(nextData);
         }
-        
-        // Обновляем счёт на карточках
-        player1ScoreSpan.innerText = data.scores[0];
-        player2ScoreSpan.innerText = data.scores[1];
-        
-        // Через 3 секунды готовим следующий раунд (или окончание игры)
-        setTimeout(() => {
-            // Если игра не закончена, показываем кнопки и запускаем таймер заново
-            // Но сервер пришлёт newRound отдельно, поэтому мы просто сбрасываем флаг ожидания
-            waitingForRoundResult = false;
-            myMoveDone = false;
-            // Анимационная арена спрячется при получении newRound
-        }, 3000);
     });
 });
 
-// Начало нового раунда
 socket.on('newRound', (data) => {
-    // Возвращаем обычный интерфейс
-    showMovesAndHideArena();
+    // Возвращаем панель выбора, если игра не в процессе анимации
+    if (!waitingForAnimation) {
+        movesPanel.style.display = 'flex';
+        arenaDiv.style.display = 'none';
+    }
     roundSpan.innerText = data.round;
     roundTimeLimit = data.timeLimit;
     startClientTimer(roundTimeLimit);
     myMoveDone = false;
-    waitingForRoundResult = false;
-    moveBtns.forEach(btn => {
-        btn.classList.remove('disabled-btn');
-        btn.disabled = false;
-    });
+    waitingForAnimation = false;
+    moveBtns.forEach(btn => btn.disabled = false);
     resultMsgDiv.innerText = 'Раунд начался! Выберите фигуру.';
 });
 
-// Конец игры
 socket.on('gameOver', (data) => {
     stopClientTimer();
-    if (roundTimerInterval) clearInterval(roundTimerInterval);
     moveBtns.forEach(btn => btn.disabled = true);
     let text = '';
     if (data.isDraw) {
-        text = '🤝 Игра закончилась ничьей после 10 ничьих 😐';
+        text = '🤝 Ничья после 10 ничьих';
     } else {
         const iWon = (data.winnerId === socket.id);
         text = iWon ? '🏆 ПОБЕДА! 🏆' : '💔 Поражение...';
-        if (iWon) canvasConfetti({ particleCount: 300, spread: 100, origin: { y: 0.5 }, startVelocity: 25 });
+        if (iWon) canvasConfetti({ particleCount: 300, spread: 100, origin: { y: 0.5 } });
     }
     document.getElementById('gameover-text').innerText = text;
     gameScreen.style.display = 'none';
@@ -255,21 +279,20 @@ socket.on('gameOver', (data) => {
 });
 
 socket.on('opponentDisconnected', () => {
-    alert('Соперник покинул игру. Возврат в поиск...');
+    alert('Соперник покинул игру');
     location.reload();
 });
 
 // --- Отправка хода ---
 function makeMove(move) {
-    if (myMoveDone || waitingForRoundResult) return;
+    if (myMoveDone || waitingForAnimation) return;
     myMoveDone = true;
     moveBtns.forEach(btn => btn.disabled = true);
     socket.emit('makeMove', { roomId: currentRoomId, move });
-    resultMsgDiv.innerText = 'Ход сделан, ожидаем соперника...';
-    // на время ожидания можно показать, что думаем
+    resultMsgDiv.innerText = 'Ход сделан, ждём соперника...';
 }
 
-// --- Получение профиля игрока ---
+// --- Получение профиля (заглушка или Яндекс) ---
 async function sendMyInfo() {
     try {
         let name = 'Игрок', avatar = '';
@@ -287,7 +310,7 @@ async function sendMyInfo() {
     } catch(e) { console.warn(e); }
 }
 
-// --- Привязка кнопок ---
+// --- Привязка событий ---
 moveBtns.forEach(btn => {
     btn.addEventListener('click', () => {
         const move = btn.getAttribute('data-move');

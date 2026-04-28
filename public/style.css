@@ -142,25 +142,7 @@ body {
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
-    transition: all 0.2s ease;
-}
-/* Анимация тряски кулака */
-@keyframes shakeFist {
-    0% { transform: translate(0, 0) rotate(0deg); }
-    25% { transform: translate(8px, -12px) rotate(12deg); }
-    50% { transform: translate(-8px, -20px) rotate(-15deg); }
-    75% { transform: translate(6px, -8px) rotate(8deg); }
-    100% { transform: translate(0, 0) rotate(0); }
-}
-.shake {
-    animation: shakeFist 0.25s ease-in-out 0s 2;
-}
-.celebration {
-    animation: bounceWin 0.5s ease 3;
-}
-@keyframes bounceWin {
-    0%,100%{ transform: scale(1); }
-    50%{ transform: scale(1.2); text-shadow: 0 0 20px gold; }
+    transition: transform 0.05s linear;
 }
 #round-info {
     text-align: center;
